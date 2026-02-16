@@ -38,7 +38,7 @@ def get_ai_response(user_input, current_level, chat_history):
 
             # --- NEW SDK SYNTAX ---
             response = client.models.generate_content(
-                model='gemini-2.5-flash',
+                model='gemini-2.5-flash-preview-09-2025' or 'gemini-flash-latest',
                 contents=full_prompt
             )
             
