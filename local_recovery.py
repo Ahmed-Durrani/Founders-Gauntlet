@@ -30,6 +30,8 @@ SNAPSHOT_KEYS = (
     "pending_voice_text",
     "last_voice_transcript",
     "voice_mic_locked",
+    "voice_mode_active",
+    "voice_recording",
     "voice_recorder_open",
     "voice_double_click_deadline",
     "voice_lock_prompt",

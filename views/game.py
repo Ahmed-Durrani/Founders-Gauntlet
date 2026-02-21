@@ -162,7 +162,10 @@ def bootstrap_local_recovery():
 
 def _render_mobile_mic_lock_bridge():
     """
-    Mobile helper: hold mic and swipe up to trigger lock toggle.
+    Mobile gesture helper:
+    - hold mic to start recording
+    - slide up while holding to lock mic
+    - release to stop if not locked
     """
     components.html(
         """
@@ -170,45 +173,83 @@ def _render_mobile_mic_lock_bridge():
 (function () {
   const doc = window.parent && window.parent.document ? window.parent.document : document;
 
-  function findButton(prefixes) {
-    const buttons = Array.from(doc.querySelectorAll("button"));
-    return buttons.find((btn) => {
-      const txt = (btn.innerText || "").trim();
-      return prefixes.some((prefix) => txt.startsWith(prefix));
-    });
-  }
-
   function bind() {
-    const micBtn = findButton(["Mic", "Rec"]);
-    const lockBtn = findButton(["Lock", "Unlock"]);
-    if (!micBtn || !lockBtn || micBtn.dataset.fgMicBound === "1") {
+    const micBtn = doc.querySelector(".st-key-fg_voice_mic_button button");
+    const lockBtn = doc.querySelector(".st-key-fg_voice_lock_button button, .st-key-fg_voice_unlock_button button");
+    const stopBtn = doc.querySelector(".st-key-fg_voice_stop_button button");
+
+    if (!micBtn || !lockBtn || !stopBtn || micBtn.dataset.fgVoiceGestureBound === "1") {
       return;
     }
-    micBtn.dataset.fgMicBound = "1";
+    micBtn.dataset.fgVoiceGestureBound = "1";
 
     let startY = null;
-    let startTs = 0;
+    let holdTimer = null;
+    let holdTriggered = false;
+    let lockTriggeredDuringHold = false;
+    let touchActive = false;
 
-    micBtn.addEventListener("touchstart", (ev) => {
+    micBtn.addEventListener("touchstart", function (ev) {
       if (!ev.touches || ev.touches.length === 0) return;
+      touchActive = true;
       startY = ev.touches[0].clientY;
-      startTs = Date.now();
+      holdTriggered = false;
+      lockTriggeredDuringHold = false;
+
+      if (holdTimer) {
+        clearTimeout(holdTimer);
+      }
+
+      holdTimer = setTimeout(function () {
+        if (!touchActive) return;
+        holdTriggered = true;
+        micBtn.click();
+        setTimeout(function () {
+          micBtn.click();
+        }, 90);
+      }, 240);
     }, { passive: true });
 
-    micBtn.addEventListener("touchmove", (ev) => {
-      if (startY === null || !ev.touches || ev.touches.length === 0) return;
+    micBtn.addEventListener("touchmove", function (ev) {
+      if (!touchActive || startY === null || !ev.touches || ev.touches.length === 0) return;
       const deltaY = startY - ev.touches[0].clientY;
-      const heldMs = Date.now() - startTs;
-      if (deltaY > 44 && heldMs > 220) {
+      if (deltaY > 44 && !lockTriggeredDuringHold) {
+        if (!holdTriggered) {
+          holdTriggered = true;
+          micBtn.click();
+          setTimeout(function () {
+            micBtn.click();
+          }, 90);
+        }
         lockBtn.click();
-        startY = null;
-        startTs = 0;
+        lockTriggeredDuringHold = true;
       }
     }, { passive: true });
 
-    micBtn.addEventListener("touchend", () => {
+    micBtn.addEventListener("touchend", function () {
+      touchActive = false;
+      if (holdTimer) {
+        clearTimeout(holdTimer);
+      }
+      const isLocked = !!doc.querySelector(".st-key-fg_voice_unlock_button button");
+      if (holdTriggered && !isLocked && !lockTriggeredDuringHold) {
+        stopBtn.click();
+      }
       startY = null;
-      startTs = 0;
+      holdTriggered = false;
+      lockTriggeredDuringHold = false;
+      holdTimer = null;
+    }, { passive: true });
+
+    micBtn.addEventListener("touchcancel", function () {
+      touchActive = false;
+      if (holdTimer) {
+        clearTimeout(holdTimer);
+      }
+      startY = null;
+      holdTriggered = false;
+      lockTriggeredDuringHold = false;
+      holdTimer = null;
     }, { passive: true });
   }
 
@@ -228,6 +269,63 @@ def _render_mobile_mic_lock_bridge():
         height=0,
         width=0,
     )
+
+
+def _render_chat_mic_near_send_bridge():
+    """
+    Desktop/mobile keyboard mode helper:
+    places the Mic trigger beside the chat send button.
+    """
+    components.html(
+        """
+<script>
+(function () {
+  const doc = window.parent && window.parent.document ? window.parent.document : document;
+
+  function place() {
+    const micWrap = doc.querySelector(".st-key-fg_open_voice_mode");
+    const chatRoot = doc.querySelector('[data-testid="stChatInput"]');
+    if (!micWrap || !chatRoot) return;
+    const sendBtn = chatRoot.querySelector("button");
+    if (!sendBtn) return;
+
+    const rect = sendBtn.getBoundingClientRect();
+    const size = Math.max(38, Math.min(44, rect.height));
+
+    micWrap.style.position = "fixed";
+    micWrap.style.left = (rect.left - size - 10) + "px";
+    micWrap.style.top = (rect.top + (rect.height - size) / 2) + "px";
+    micWrap.style.margin = "0";
+    micWrap.style.zIndex = "10020";
+    micWrap.style.width = size + "px";
+  }
+
+  let tries = 0;
+  const timer = setInterval(function () {
+    place();
+    tries += 1;
+    if (tries > 40) {
+      clearInterval(timer);
+    }
+  }, 120);
+
+  place();
+  window.addEventListener("resize", place);
+})();
+</script>
+""",
+        height=0,
+        width=0,
+    )
+
+
+def _stop_voice_capture(message="Recording stopped."):
+    st.session_state.voice_recording = False
+    st.session_state.voice_mic_locked = False
+    st.session_state.voice_recorder_open = False
+    st.session_state.voice_double_click_deadline = 0.0
+    st.session_state.voice_audio_nonce = int(st.session_state.voice_audio_nonce) + 1
+    st.session_state.voice_lock_prompt = message
 
 
 def _handle_voice_audio_capture(audio_file):
@@ -251,6 +349,7 @@ def _handle_voice_audio_capture(audio_file):
         st.session_state.pending_voice_text = transcript
         st.session_state.voice_lock_prompt = "Voice draft ready. Edit and send."
         if not st.session_state.voice_mic_locked:
+            st.session_state.voice_recording = False
             st.session_state.voice_recorder_open = False
     else:
         st.session_state.voice_lock_prompt = "Transcription failed. Record again."
@@ -264,56 +363,123 @@ def render_compact_voice_controls():
     deadline = float(st.session_state.voice_double_click_deadline or 0.0)
     if deadline and now > deadline:
         st.session_state.voice_double_click_deadline = 0.0
-        if st.session_state.voice_lock_prompt == "Click mic again to lock on desktop.":
+        if st.session_state.voice_lock_prompt == "Click Mic again to start recording (desktop).":
             st.session_state.voice_lock_prompt = ""
 
-    mic_col, lock_col, status_col = st.columns([0.16, 0.16, 0.68], gap="small")
-    with mic_col:
-        mic_label = "Rec" if st.session_state.voice_recorder_open else "Mic"
-        mic_clicked = st.button(
-            mic_label,
-            key="fg_chat_mic_button",
-            help="Tap mic to record once. Double-click on desktop to lock.",
+    if not st.session_state.voice_mode_active:
+        with st.container(key="fg_chat_mic_anchor"):
+            enter_voice_mode = st.button(
+                "Mic",
+                key="fg_open_voice_mode",
+                help="Open voice mode.",
+            )
+        _render_chat_mic_near_send_bridge()
+        if enter_voice_mode:
+            st.session_state.voice_mode_active = True
+            st.session_state.voice_lock_prompt = (
+                "Voice mode on. Desktop: double-click Mic. Mobile: hold Mic, slide up to lock."
+            )
+            st.session_state.voice_double_click_deadline = 0.0
+            st.rerun()
+        return voice_user_input, True
+
+    with st.container(key="fg_voice_bar_shell"):
+        st.caption("Voice mode active. Desktop: double-click Mic. Mobile: hold Mic and slide up to lock.")
+        mic_col, lock_col, stop_col, exit_col = st.columns([0.18, 0.18, 0.18, 0.46], gap="small")
+        with mic_col:
+            mic_clicked = st.button(
+                "Mic",
+                key="fg_voice_mic_button",
+                help="Desktop: double-click to start. Mobile: hold to record.",
+            )
+        with lock_col:
+            if st.session_state.voice_mic_locked:
+                lock_clicked = st.button(
+                    "Unlock",
+                    key="fg_voice_unlock_button",
+                    help="Unlock the microphone.",
+                )
+            else:
+                lock_clicked = st.button(
+                    "Lock",
+                    key="fg_voice_lock_button",
+                    help="Lock the microphone while recording.",
+                )
+        with stop_col:
+            stop_clicked = st.button(
+                "Stop",
+                key="fg_voice_stop_button",
+                help="Stop current voice capture.",
+            )
+        with exit_col:
+            exit_voice_mode = st.button(
+                "Type",
+                key="fg_voice_exit_mode",
+                help="Return to text chat input.",
+            )
+
+        wave_state = "is-recording" if st.session_state.voice_recording else "is-idle"
+        wave_label = "Recording" if st.session_state.voice_recording else "Ready"
+        lock_label = "Locked" if st.session_state.voice_mic_locked else "Unlocked"
+        st.markdown(
+            f"""
+<div class="fg-voice-wave {wave_state}">
+  <span class="fg-wave-dot"></span>
+  <span class="fg-wave-text">{wave_label} - {lock_label}</span>
+  <span class="fg-wave-bars">
+    <i></i><i></i><i></i><i></i><i></i>
+  </span>
+</div>
+""",
+            unsafe_allow_html=True,
         )
-    with lock_col:
-        lock_label = "Unlock" if st.session_state.voice_mic_locked else "Lock"
-        lock_clicked = st.button(
-            lock_label,
-            key="fg_chat_mic_lock_button",
-            help="Toggle mic lock.",
-        )
+
+    if exit_voice_mode:
+        _stop_voice_capture("Returned to keyboard mode.")
+        st.session_state.voice_mode_active = False
+        st.rerun()
 
     if mic_clicked:
         st.session_state.voice_recorder_open = True
-        if st.session_state.voice_mic_locked:
-            st.session_state.voice_lock_prompt = "Mic is locked."
+        if st.session_state.voice_recording:
+            st.session_state.voice_lock_prompt = "Recording in progress. Press Stop when done."
         else:
             if deadline and now <= deadline:
-                st.session_state.voice_mic_locked = True
+                st.session_state.voice_recording = True
                 st.session_state.voice_double_click_deadline = 0.0
-                st.session_state.voice_lock_prompt = "Mic locked (desktop double-click)."
+                st.session_state.voice_lock_prompt = "Recording started."
             else:
-                st.session_state.voice_double_click_deadline = now + 1.35
-                st.session_state.voice_lock_prompt = "Click mic again to lock on desktop."
+                st.session_state.voice_double_click_deadline = now + 1.25
+                st.session_state.voice_lock_prompt = "Click Mic again to start recording (desktop)."
 
     if lock_clicked:
-        st.session_state.voice_mic_locked = not st.session_state.voice_mic_locked
-        st.session_state.voice_double_click_deadline = 0.0
-        if st.session_state.voice_mic_locked:
-            st.session_state.voice_recorder_open = True
-            st.session_state.voice_lock_prompt = "Mic lock enabled."
+        if not st.session_state.voice_recording:
+            st.session_state.voice_lock_prompt = "Start recording first, then lock the mic."
         else:
-            st.session_state.voice_lock_prompt = "Mic lock disabled."
+            st.session_state.voice_mic_locked = not st.session_state.voice_mic_locked
+            st.session_state.voice_recorder_open = True
+            st.session_state.voice_lock_prompt = (
+                "Mic locked. Press Stop when done."
+                if st.session_state.voice_mic_locked
+                else "Mic unlocked."
+            )
 
+    if stop_clicked:
+        _stop_voice_capture("Recording stopped.")
+
+    status_col = st.container()
     with status_col:
         if st.session_state.voice_lock_prompt:
             st.caption(st.session_state.voice_lock_prompt)
         else:
-            st.caption("Mobile: hold mic and swipe up to lock. Desktop: double-click mic to lock.")
+            st.caption("Mobile: hold Mic and slide up to lock. Desktop: double-click Mic to start.")
 
     _render_mobile_mic_lock_bridge()
 
-    show_recorder = bool(st.session_state.voice_recorder_open or st.session_state.voice_mic_locked)
+    show_recorder = bool(
+        st.session_state.voice_mode_active
+        and (st.session_state.voice_recording or st.session_state.voice_mic_locked)
+    )
     if show_recorder:
         audio_file = st.audio_input(
             "Record your pitch",
@@ -347,7 +513,7 @@ def render_compact_voice_controls():
             st.session_state.pending_voice_text = ""
             st.session_state.voice_lock_prompt = "Voice draft discarded."
 
-    return voice_user_input
+    return voice_user_input, False
 
 
 def apply_perk_choice(perk_key, next_level):
@@ -602,10 +768,26 @@ def render_game_view():
     render_sidebar()
     render_damage_flash_overlay()
 
-    st.title("The Founder's Gauntlet")
-    st.markdown("Pitch your startup. Survive the investors. Don't run out of confidence.")
-    st.caption(f"Current Theme: {st.session_state.startup_theme}")
-    st.caption("Streaming mode enabled: investor replies render token-by-token.")
+    st.markdown(
+        "<h1 style='color:#000000 !important; margin-bottom:0.25rem;'>The Founder's Gauntlet</h1>",
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        "<p style='color:#000000 !important; margin:0 0 0.5rem 0;'>"
+        "Pitch your startup. Survive the investors. Don't run out of confidence."
+        "</p>",
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        f"<p style='color:#000000 !important; margin:0;'>Current Theme: {st.session_state.startup_theme}</p>",
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        "<p style='color:#000000 !important; margin:0.15rem 0 0.65rem 0;'>"
+        "Streaming mode enabled: investor replies render token-by-token."
+        "</p>",
+        unsafe_allow_html=True,
+    )
 
     if st.session_state.pitch_deck_text:
         st.caption("Pitch deck context loaded. Investor responses cross-reference your uploaded document.")
@@ -698,8 +880,12 @@ def render_game_view():
             else:
                 st.chat_message("assistant").write(msg["content"])
 
-    voice_user_input = render_compact_voice_controls()
-    typed_input = st.chat_input("Type your pitch response here...")
+    voice_user_input, allow_typed_input = render_compact_voice_controls()
+    typed_input = (
+        st.chat_input("Type your pitch response here...")
+        if allow_typed_input
+        else None
+    )
     user_input = typed_input or voice_user_input
 
     if not user_input:
