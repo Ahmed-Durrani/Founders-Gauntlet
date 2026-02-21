@@ -1,3 +1,6 @@
 streamlit
 google-genai
 python-dotenv
+pypdf
+psycopg[binary]
+streamlit-local-storage

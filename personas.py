@@ -38,9 +38,58 @@ LEVELS = {
     }
 }
 
-def get_system_prompt(level_id):
+THEMES = {
+    "General SaaS": {
+        "description": "A software startup with typical web/mobile delivery and standard compliance expectations.",
+        "focus_areas": [
+            "clear user value proposition",
+            "go-to-market strategy",
+            "unit economics and retention",
+            "technical feasibility and scalability",
+        ],
+    },
+    "MedTech": {
+        "description": "A healthcare-adjacent technology product that may include regulated workflows and device reliability constraints.",
+        "focus_areas": [
+            "patient safety and risk controls",
+            "regulatory readiness and auditability",
+            "offline reliability for home equipment troubleshooting",
+            "hardware and connectivity edge cases",
+        ],
+    },
+    "Web3": {
+        "description": "A blockchain-enabled product where trust, security, and protocol design are central risks.",
+        "focus_areas": [
+            "smart contract security architecture",
+            "wallet and key-management UX risks",
+            "threat modeling and exploit mitigation",
+            "clear token utility and sustainable incentives",
+        ],
+    },
+    "FinTech": {
+        "description": "A financial product requiring trust, controls, and reliability under strict operational constraints.",
+        "focus_areas": [
+            "fraud prevention and controls",
+            "regulatory/compliance posture",
+            "latency and transaction reliability",
+            "risk management and customer trust",
+        ],
+    },
+    "ClimateTech": {
+        "description": "A climate or sustainability product balancing measurable impact with commercial viability.",
+        "focus_areas": [
+            "impact measurement rigor",
+            "deployment constraints in real-world operations",
+            "cost structure and incentives",
+            "partnerships and adoption barriers",
+        ],
+    },
+}
+
+def get_system_prompt(level_id, theme_name, theme_data):
     """Generates the master instruction for the LLM based on the current level."""
     level_data = LEVELS.get(level_id)
+    focus_areas = ", ".join(theme_data["focus_areas"])
     
     return f"""
     SYSTEM INSTRUCTION:
@@ -53,8 +102,15 @@ def get_system_prompt(level_id):
     Style: {level_data['style']}
     Win Condition: {level_data['win_condition']}
 
+    STARTUP THEME CONTEXT:
+    Theme: {theme_name}
+    Theme Description: {theme_data['description']}
+    Mandatory Challenge Areas: {focus_areas}
+
     GAME RULES:
     - You represent a startup pitch meeting obstacle.
+    - Tailor your questions and skepticism to the selected theme and mandatory challenge areas.
+    - Keep probing the most relevant risks and edge cases for this theme.
     - If the user's answer is bad, vague, or violates the character's preferences, assign damage (-10 for minor mistakes, -20 for major failures).
     - If the user's answer is good and satisfies the Win Condition effectively, set "level_passed" to true.
     - If the conversation is ongoing but neutral, damage is 0 and passed is false.
