@@ -37,10 +37,10 @@ def _blend(hex_a, hex_b, t):
 ensure_session_state()
 
 hp = max(0, min(100, int(st.session_state.current_hp)))
-bg_top = "#ffffff"
-bg_mid = "#ffffff"
-bg_bottom = "#ffffff"
-bg_vignette = "#ffffff"
+bg_top = "#0a0e17"
+bg_mid = "#0a0e17"
+bg_bottom = "#0a0e17"
+bg_vignette = "#0a0e17"
 
 global_css = """
 <style>
@@ -70,6 +70,15 @@ global_css = """
         50% { background-position: 58% 5%, 42% 96%, 0 0; }
         100% { background-position: 50% 0%, 50% 100%, 0 0; }
     }
+    @keyframes fgFadeInUp {
+        0% { opacity: 0; transform: translateY(16px); }
+        100% { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fgSubtleFloat {
+        0% { transform: translateY(0); }
+        50% { transform: translateY(-3px); }
+        100% { transform: translateY(0); }
+    }
     html, body, [data-testid="stAppViewContainer"], [data-testid="stAppViewContainer"] * {
         touch-action: manipulation;
     }
@@ -81,7 +90,7 @@ global_css = """
         position: relative;
         height: 100dvh !important;
         overflow: hidden !important;
-        background: #ffffff !important;
+        background: #0a0e17 !important;
         animation: none !important;
         transition: none !important;
     }
@@ -102,6 +111,7 @@ global_css = """
         overflow-y: auto !important;
         overflow-x: hidden !important;
         scrollbar-width: none !important;
+        background: transparent !important;
     }
     [data-testid="stAppViewContainer"] > .main::-webkit-scrollbar {
         width: 0 !important;
@@ -113,8 +123,8 @@ global_css = """
         z-index: 1;
     }
     [data-testid="stSidebar"] {
-        background: #ffffff !important;
-        border-right: 1px solid #e5e7eb;
+        background: #0f1419 !important;
+        border-right: 1px solid #1e2a3a;
         overflow: hidden !important;
     }
     [data-testid="stSidebar"] > div:first-child {
@@ -126,10 +136,40 @@ global_css = """
         overscroll-behavior: contain;
     }
     [data-testid="stSidebar"] * {
-        color: #111111 !important;
+        color: #e8eaed !important;
     }
     [data-testid="stMetric"], .stAlert, .stChatMessage, [data-testid="stDataFrame"], [data-testid="stExpander"] {
-        backdrop-filter: blur(3px);
+        backdrop-filter: blur(12px);
+        background: rgba(255, 255, 255, 0.05) !important;
+        border: 1px solid rgba(255,255,255,0.10) !important;
+        border-radius: 16px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        animation: fgFadeInUp 0.5s ease-out both;
+    }
+    .stChatMessage {
+        animation: fgSubtleFloat 6s ease-in-out infinite;
+    }
+    [data-testid="stChatInput"] {
+        background: rgba(255,255,255,0.92) !important;
+        border: 1px solid rgba(255,255,255,0.20) !important;
+        border-radius: 14px !important;
+        backdrop-filter: blur(8px);
+    }
+    [data-testid="stChatInput"] textarea {
+        color: #111111 !important;
+        caret-color: #111111 !important;
+    }
+    [data-testid="stChatInput"] textarea::placeholder {
+        color: #6b7280 !important;
+    }
+    [data-testid="stChatInput"] button {
+        color: #111111 !important;
+        transition: all 200ms ease !important;
+    }
+    [data-testid="stChatInput"] button:active {
+        background: rgba(0, 0, 0, 0.25) !important;
+        transform: scale(0.94) !important;
+        box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.3) !important;
     }
     #MainMenu, footer, [data-testid="stDecoration"] {
         visibility: hidden;
@@ -149,10 +189,10 @@ global_css = """
     [data-testid="stAppViewContainer"] > .main .block-container {
         padding-top: 0.8rem;
         padding-bottom: 1rem;
-        color: #111111 !important;
+        color: #e8eaed !important;
     }
     [data-testid="stAppViewContainer"] > .main {
-        color: #111111 !important;
+        color: #e8eaed !important;
     }
     [data-testid="stAppViewContainer"] > .main h1,
     [data-testid="stAppViewContainer"] > .main h2,
@@ -162,61 +202,133 @@ global_css = """
     [data-testid="stAppViewContainer"] > .main label,
     [data-testid="stAppViewContainer"] > .main [data-testid="stMarkdownContainer"],
     [data-testid="stAppViewContainer"] > .main [data-testid="stCaptionContainer"] {
-        color: #111111 !important;
+        color: #e8eaed !important;
         text-shadow: none !important;
     }
     [data-testid="stAppViewContainer"] > .main [data-testid="stCaptionContainer"] {
-        color: #111111 !important;
+        color: #9ca3af !important;
     }
     [data-testid="stAppViewContainer"] > .main [data-testid="stHeading"] * {
-        color: #111111 !important;
+        color: #ffffff !important;
     }
     [data-testid="stChatMessageContent"] * {
-        color: #111111 !important;
+        color: #e8eaed !important;
     }
     [data-testid="stAppViewContainer"] > .main .block-container *:not(button):not(input):not(textarea) {
-        color: #111111 !important;
+        color: #e8eaed !important;
+    }
+    /* ── Metric widget ── */
+    [data-testid="stMetricValue"] {
+        color: #ffffff !important;
+    }
+    [data-testid="stMetricLabel"] {
+        color: #9ca3af !important;
+    }
+    [data-testid="stMetricDelta"] svg {
+        fill: currentColor !important;
+    }
+    /* ── DataFrames & tables ── */
+    [data-testid="stDataFrame"],
+    [data-testid="stDataFrame"] * {
+        color: #e8eaed !important;
+    }
+    [data-testid="stDataFrame"] [role="columnheader"] {
+        color: #ffffff !important;
+        font-weight: 700 !important;
+    }
+    [data-testid="stTable"],
+    [data-testid="stTable"] th,
+    [data-testid="stTable"] td {
+        color: #e8eaed !important;
+        border-color: rgba(255,255,255,0.08) !important;
+    }
+    /* ── Expanders ── */
+    [data-testid="stExpander"] summary,
+    [data-testid="stExpander"] summary span,
+    [data-testid="stExpander"] summary p {
+        color: #e8eaed !important;
+    }
+    [data-testid="stExpander"] svg {
+        fill: #e8eaed !important;
+    }
+    /* ── Info / Warning / Error boxes ── */
+    .stAlert p, .stAlert span, .stAlert div {
+        color: #e8eaed !important;
+    }
+    [data-testid="stNotification"] p {
+        color: #e8eaed !important;
+    }
+    /* ── Tabs ── */
+    [data-testid="stTab"],
+    button[data-baseweb="tab"] {
+        color: #9ca3af !important;
+    }
+    button[data-baseweb="tab"][aria-selected="true"] {
+        color: #ffffff !important;
+    }
+    /* ── Text area ── */
+    [data-testid="stTextArea"] textarea {
+        color: #e8eaed !important;
+        background: rgba(255,255,255,0.05) !important;
+        border-color: rgba(255,255,255,0.12) !important;
+    }
+    /* ── Selectbox / multiselect ── */
+    [data-baseweb="select"] * {
+        color: #e8eaed !important;
+    }
+    [data-baseweb="popover"] [role="listbox"] {
+        background: #1a1f2e !important;
+    }
+    [data-baseweb="popover"] [role="option"] {
+        color: #e8eaed !important;
+    }
+    [data-baseweb="popover"] [role="option"]:hover {
+        background: rgba(255,255,255,0.08) !important;
     }
     .stButton > button {
-        background: #ffffff !important;
-        color: #111111 !important;
-        border: 1px solid #d1d5db !important;
+        background: rgba(255,255,255,0.06) !important;
+        color: #e8eaed !important;
+        border: 1px solid rgba(255,255,255,0.12) !important;
         border-radius: 14px;
         min-height: 44px;
         width: 100%;
         font-weight: 700;
-        transition: transform 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+        transition: all 280ms cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        backdrop-filter: blur(8px);
     }
     .stButton > button:hover {
-        background: #f8fafc !important;
-        color: #111111 !important;
-        opacity: 0.97;
+        background: rgba(255,255,255,0.10) !important;
+        color: #ffffff !important;
+        transform: scale(1.02) translateY(-1px);
+        box-shadow: 0 6px 24px rgba(59, 130, 246, 0.2), 0 0 0 1px rgba(59, 130, 246, 0.15);
+        border-color: rgba(59, 130, 246, 0.3) !important;
     }
     .stButton > button:active {
-        transform: scale(0.95);
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+        transform: scale(0.97);
+        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.25);
     }
     [data-testid="stTextInput"] div[data-baseweb="input"] {
-        background: #ffffff !important;
-        border: 1px solid #94a3b8 !important;
+        background: rgba(255,255,255,0.05) !important;
+        border: 1px solid rgba(255,255,255,0.12) !important;
         border-radius: 10px !important;
         box-shadow: none !important;
+        transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
     }
     [data-testid="stTextInput"] div[data-baseweb="input"]:focus-within {
-        border-color: #111827 !important;
-        box-shadow: 0 0 0 2px rgba(17, 24, 39, 0.12) !important;
+        border-color: rgba(59, 130, 246, 0.5) !important;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15), 0 0 20px rgba(59, 130, 246, 0.1) !important;
     }
     [data-testid="stTextInput"] input {
-        color: #111111 !important;
-        caret-color: #111111 !important;
+        color: #e8eaed !important;
+        caret-color: #e8eaed !important;
     }
     .st-key-fg_chat_mic_anchor {
         height: 0 !important;
         margin: 0 !important;
         padding: 0 !important;
     }
-    .st-key-fg_open_voice_mode {
+    .st-key-fg_mic_btn {
         position: fixed;
         right: 7.2rem;
         bottom: 1.15rem;
@@ -224,179 +336,103 @@ global_css = """
         margin: 0 !important;
         width: 42px !important;
     }
-    .st-key-fg_open_voice_mode button {
+    .st-key-fg_mic_btn button {
         width: 42px !important;
         min-height: 42px !important;
         border-radius: 999px !important;
         padding: 0 !important;
-        background: #ffffff !important;
-        border: 1px solid #d1d5db !important;
-        color: #111111 !important;
-        font-size: 0.82rem !important;
-        font-weight: 800 !important;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14) !important;
+        background: rgba(255,255,255,0.10) !important;
+        border: 1px solid rgba(255,255,255,0.20) !important;
+        color: #e8eaed !important;
+        font-size: 1.1rem !important;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255,255,255,0.08) !important;
+        backdrop-filter: blur(12px) !important;
+        transition: all 280ms cubic-bezier(0.4, 0, 0.2, 1) !important;
     }
-    .st-key-fg_open_voice_mode button:hover {
-        background: #f8fafc !important;
-        color: #111111 !important;
-        opacity: 0.95 !important;
-        transform: scale(0.96);
+    .st-key-fg_mic_btn button:hover {
+        background: rgba(59, 130, 246, 0.15) !important;
+        color: #ffffff !important;
+        transform: scale(1.08) !important;
+        box-shadow: 0 0 24px rgba(59, 130, 246, 0.3), 0 0 0 2px rgba(59, 130, 246, 0.2), 0 4px 16px rgba(0, 0, 0, 0.3) !important;
+        border-color: rgba(59, 130, 246, 0.4) !important;
     }
-    .st-key-fg_voice_bar_shell {
-        background: #ffffff !important;
-        border: 1px solid #d1d5db;
-        border-radius: 24px;
-        padding: 0.55rem 0.65rem 0.65rem 0.65rem;
-        margin-top: 0.25rem;
-        margin-bottom: 0.35rem;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-    }
-    .st-key-fg_voice_bar_shell [data-testid="stCaptionContainer"] {
-        color: #111111 !important;
-        margin-bottom: 0.2rem;
-    }
-    .st-key-fg_voice_mic_button button,
-    .st-key-fg_voice_lock_button button,
-    .st-key-fg_voice_unlock_button button,
-    .st-key-fg_voice_stop_button button {
-        width: 56px !important;
-        min-height: 56px !important;
-        border-radius: 999px !important;
+    /* Hidden helper buttons for JS bridge */
+    .st-key-fg_mic_lock, .st-key-fg_mic_stop {
+        height: 0 !important;
+        overflow: hidden !important;
+        margin: 0 !important;
         padding: 0 !important;
-        font-weight: 800 !important;
-        font-size: 0.8rem !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
     }
-    .st-key-fg_voice_mic_button button {
-        background: #ffffff !important;
-        border: 1px solid #d1d5db !important;
-        color: #111111 !important;
+    /* Recording overlay */
+    @keyframes fgRecDotPulse {
+        0% { transform: scale(0.8); opacity: 0.5; }
+        50% { transform: scale(1.3); opacity: 1; }
+        100% { transform: scale(0.8); opacity: 0.5; }
     }
-    .st-key-fg_voice_lock_button button {
-        background: #ffffff !important;
-        border: 1px solid #d1d5db !important;
-        color: #111111 !important;
-    }
-    .st-key-fg_voice_unlock_button button {
-        background: #ffffff !important;
-        border: 1px solid #d1d5db !important;
-        color: #111111 !important;
-    }
-    .st-key-fg_voice_stop_button button {
-        background: #ffffff !important;
-        border: 1px solid #d1d5db !important;
-        color: #111111 !important;
-    }
-    .st-key-fg_voice_exit_mode button {
-        min-height: 56px !important;
-        border-radius: 999px !important;
-        background: #ffffff !important;
-        border: 1px solid #d1d5db !important;
-        color: #111111 !important;
-        font-weight: 800 !important;
-        font-size: 0.88rem !important;
-    }
-    @keyframes fgVoiceDotPulse {
-        0% { transform: scale(0.9); opacity: 0.45; }
-        50% { transform: scale(1.4); opacity: 1; }
-        100% { transform: scale(0.9); opacity: 0.45; }
-    }
-    @keyframes fgVoiceBars {
-        0%, 100% { transform: scaleY(0.3); opacity: 0.48; }
-        50% { transform: scaleY(1); opacity: 1; }
-    }
-    .st-key-fg_voice_bar_shell .fg-voice-wave {
-        margin-top: 0.35rem;
-        border-radius: 999px;
-        background: #f8fafc;
-        border: 1px solid #d1d5db;
-        padding: 0.32rem 0.58rem;
+    .fg-recording-overlay {
         display: flex;
         align-items: center;
-        gap: 0.45rem;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        background: rgba(239, 68, 68, 0.12);
+        border: 1px solid rgba(239, 68, 68, 0.25);
+        border-radius: 12px;
+        margin: 0.35rem 0;
     }
-    .st-key-fg_voice_bar_shell .fg-wave-dot {
-        width: 8px;
-        height: 8px;
+    .fg-rec-dot {
+        width: 10px;
+        height: 10px;
         border-radius: 999px;
-        background: #64748b;
-        flex: 0 0 auto;
+        background: #ef4444;
+        animation: fgRecDotPulse 1s ease-in-out infinite;
     }
-    .st-key-fg_voice_bar_shell .is-recording .fg-wave-dot {
-        background: #ff6d7a;
-        animation: fgVoiceDotPulse 920ms ease-in-out infinite;
-    }
-    .st-key-fg_voice_bar_shell .fg-wave-text {
-        color: #111111;
-        font-size: 0.84rem;
-        font-weight: 650;
-        white-space: nowrap;
-    }
-    .st-key-fg_voice_bar_shell .fg-wave-bars {
-        margin-left: auto;
-        display: flex;
-        align-items: flex-end;
-        gap: 3px;
-        height: 16px;
-    }
-    .st-key-fg_voice_bar_shell .fg-wave-bars i {
-        width: 3px;
-        height: 14px;
-        border-radius: 999px;
-        background: #475569;
-        transform-origin: center bottom;
-        display: inline-block;
-    }
-    .st-key-fg_voice_bar_shell .is-recording .fg-wave-bars i {
-        animation: fgVoiceBars 900ms ease-in-out infinite;
-    }
-    .st-key-fg_voice_bar_shell .is-recording .fg-wave-bars i:nth-child(2) { animation-delay: 80ms; }
-    .st-key-fg_voice_bar_shell .is-recording .fg-wave-bars i:nth-child(3) { animation-delay: 150ms; }
-    .st-key-fg_voice_bar_shell .is-recording .fg-wave-bars i:nth-child(4) { animation-delay: 220ms; }
-    .st-key-fg_voice_bar_shell .is-recording .fg-wave-bars i:nth-child(5) { animation-delay: 300ms; }
-    .st-key-fg_voice_bar_shell .is-idle .fg-wave-bars i {
-        transform: scaleY(0.38);
-        opacity: 0.4;
+    .fg-rec-text {
+        color: #fca5a5;
+        font-size: 0.85rem;
+        font-weight: 600;
     }
     [data-testid="stFileUploader"] {
-        background: #ffffff;
+        background: rgba(255,255,255,0.03);
         border-radius: 14px;
         padding: 0.25rem;
     }
     section[data-testid="stFileUploaderDropzone"] {
-        background: #ffffff !important;
-        border: 1px dashed #cbd5e1 !important;
+        background: rgba(255,255,255,0.04) !important;
+        border: 1px dashed rgba(255,255,255,0.15) !important;
         border-radius: 14px !important;
-        color: #111111 !important;
+        color: #e8eaed !important;
     }
     section[data-testid="stFileUploaderDropzone"] * {
-        color: #111111 !important;
+        color: #e8eaed !important;
     }
     [data-testid="stFileUploaderDropzoneInstructions"] {
-        color: #111111 !important;
+        color: #e8eaed !important;
     }
     [data-testid="stFileUploaderDropzoneInstructions"] small,
     [data-testid="stFileUploaderDropzoneInstructions"] span {
-        color: #111111 !important;
+        color: #9ca3af !important;
     }
     [data-testid="stFileUploaderFileName"] {
-        color: #111111 !important;
-        background: #f8fafc;
+        color: #e8eaed !important;
+        background: rgba(255,255,255,0.06);
         border-radius: 8px;
         padding: 0.2rem 0.35rem;
     }
     [data-testid="stFileUploader"] button,
     section[data-testid="stFileUploaderDropzone"] button {
-        background: #ffffff !important;
-        color: #111111 !important;
-        border: 1px solid #d1d5db !important;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+        background: rgba(255,255,255,0.08) !important;
+        color: #e8eaed !important;
+        border: 1px solid rgba(255,255,255,0.15) !important;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
     }
     [data-testid="stFileUploader"] button:hover,
     section[data-testid="stFileUploaderDropzone"] button:hover {
-        background: #f8fafc !important;
-        color: #111111 !important;
-        border-color: #cbd5e1 !important;
-        opacity: 0.97 !important;
+        background: rgba(255,255,255,0.14) !important;
+        color: #ffffff !important;
+        border-color: rgba(255,255,255,0.2) !important;
+        opacity: 1 !important;
     }
     [data-testid="stFileUploader"] button:active,
     section[data-testid="stFileUploaderDropzone"] button:active {
@@ -489,6 +525,103 @@ global_css = (
     .replace("__BG_VIGNETTE__", bg_vignette)
 )
 st.markdown(global_css, unsafe_allow_html=True)
+
+# ── Animated SVG constellation background ──────────────────────────────
+# Represents the startup ecosystem: nodes = founders/investors/ideas,
+# lines = connections, pulsing glow = the pressure of the pitch.
+_svg_bg = """
+<div id="fg-constellation-bg" style="
+  position:fixed; inset:0; z-index:0; pointer-events:none;
+  overflow:hidden; background:transparent;
+">
+<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"
+     viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice"
+     style="position:absolute;inset:0;width:100%;height:100%;">
+  <defs>
+    <!-- Gradient blobs -->
+    <radialGradient id="blob-a" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#3b82f6" stop-opacity="0.12"/><stop offset="100%" stop-color="#3b82f6" stop-opacity="0"/></radialGradient>
+    <radialGradient id="blob-b" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#8b5cf6" stop-opacity="0.10"/><stop offset="100%" stop-color="#8b5cf6" stop-opacity="0"/></radialGradient>
+    <radialGradient id="blob-c" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#06b6d4" stop-opacity="0.08"/><stop offset="100%" stop-color="#06b6d4" stop-opacity="0"/></radialGradient>
+    <!-- Node glows -->
+    <radialGradient id="ng1"><stop offset="0%" stop-color="#3b82f6" stop-opacity="0.5"/><stop offset="100%" stop-color="#3b82f6" stop-opacity="0"/></radialGradient>
+    <radialGradient id="ng2"><stop offset="0%" stop-color="#8b5cf6" stop-opacity="0.4"/><stop offset="100%" stop-color="#8b5cf6" stop-opacity="0"/></radialGradient>
+    <radialGradient id="ng3"><stop offset="0%" stop-color="#06b6d4" stop-opacity="0.4"/><stop offset="100%" stop-color="#06b6d4" stop-opacity="0"/></radialGradient>
+    <filter id="soften"><feGaussianBlur stdDeviation="0.8"/></filter>
+  </defs>
+
+  <!-- Layer 1: Large animated gradient blobs (Vercel/Stripe vibe) -->
+  <ellipse cx="320" cy="250" rx="400" ry="300" fill="url(#blob-a)" opacity="0.08">
+    <animate attributeName="cx" values="320;420;280;320" dur="20s" repeatCount="indefinite"/>
+    <animate attributeName="cy" values="250;320;200;250" dur="16s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0.06;0.12;0.06" dur="12s" repeatCount="indefinite"/>
+  </ellipse>
+  <ellipse cx="1100" cy="350" rx="350" ry="280" fill="url(#blob-b)" opacity="0.07">
+    <animate attributeName="cx" values="1100;1020;1150;1100" dur="18s" repeatCount="indefinite"/>
+    <animate attributeName="cy" values="350;280;400;350" dur="14s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0.05;0.10;0.05" dur="15s" repeatCount="indefinite"/>
+  </ellipse>
+  <ellipse cx="700" cy="700" rx="380" ry="260" fill="url(#blob-c)" opacity="0.06">
+    <animate attributeName="cx" values="700;780;650;700" dur="19s" repeatCount="indefinite"/>
+    <animate attributeName="cy" values="700;640;750;700" dur="17s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0.05;0.09;0.05" dur="13s" repeatCount="indefinite"/>
+  </ellipse>
+
+  <!-- Layer 2: Neural network lines (thin, pulsing) -->
+  <g stroke-width="0.5" fill="none" filter="url(#soften)">
+    <line x1="140" y1="120" x2="380" y2="260" stroke="#3b82f6" opacity="0.08"><animate attributeName="opacity" values="0.04;0.12;0.04" dur="9s" repeatCount="indefinite"/></line>
+    <line x1="380" y1="260" x2="620" y2="160" stroke="#8b5cf6" opacity="0.07"><animate attributeName="opacity" values="0.03;0.10;0.03" dur="11s" repeatCount="indefinite"/></line>
+    <line x1="620" y1="160" x2="900" y2="320" stroke="#06b6d4" opacity="0.06"><animate attributeName="opacity" values="0.03;0.09;0.03" dur="13s" repeatCount="indefinite"/></line>
+    <line x1="900" y1="320" x2="1180" y2="180" stroke="#3b82f6" opacity="0.07"><animate attributeName="opacity" values="0.04;0.11;0.04" dur="10s" repeatCount="indefinite"/></line>
+    <line x1="1180" y1="180" x2="1360" y2="400" stroke="#8b5cf6" opacity="0.06"><animate attributeName="opacity" values="0.03;0.09;0.03" dur="12s" repeatCount="indefinite"/></line>
+    <line x1="220" y1="520" x2="460" y2="640" stroke="#06b6d4" opacity="0.06"><animate attributeName="opacity" values="0.03;0.09;0.03" dur="14s" repeatCount="indefinite"/></line>
+    <line x1="460" y1="640" x2="740" y2="500" stroke="#3b82f6" opacity="0.07"><animate attributeName="opacity" values="0.04;0.10;0.04" dur="9s" repeatCount="indefinite"/></line>
+    <line x1="740" y1="500" x2="1040" y2="680" stroke="#8b5cf6" opacity="0.06"><animate attributeName="opacity" values="0.03;0.09;0.03" dur="15s" repeatCount="indefinite"/></line>
+    <line x1="1040" y1="680" x2="1320" y2="560" stroke="#06b6d4" opacity="0.05"><animate attributeName="opacity" values="0.03;0.08;0.03" dur="11s" repeatCount="indefinite"/></line>
+    <!-- Cross-links for depth -->
+    <line x1="140" y1="120" x2="220" y2="520" stroke="#3b82f6" opacity="0.04"><animate attributeName="opacity" values="0.02;0.07;0.02" dur="16s" repeatCount="indefinite"/></line>
+    <line x1="620" y1="160" x2="740" y2="500" stroke="#8b5cf6" opacity="0.04"><animate attributeName="opacity" values="0.02;0.06;0.02" dur="18s" repeatCount="indefinite"/></line>
+    <line x1="900" y1="320" x2="1040" y2="680" stroke="#06b6d4" opacity="0.04"><animate attributeName="opacity" values="0.02;0.06;0.02" dur="14s" repeatCount="indefinite"/></line>
+  </g>
+
+  <!-- Layer 3: Floating nodes with glow halos -->
+  <circle cx="140" cy="120" r="2.5" fill="#3b82f6" opacity="0.5"><animate attributeName="cy" values="120;108;126;120" dur="18s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.35;0.65;0.35" dur="5s" repeatCount="indefinite"/></circle>
+  <circle cx="140" cy="120" r="12" fill="url(#ng1)" opacity="0.2"><animate attributeName="cy" values="120;108;126;120" dur="18s" repeatCount="indefinite"/><animate attributeName="r" values="10;16;10" dur="5s" repeatCount="indefinite"/></circle>
+
+  <circle cx="380" cy="260" r="2" fill="#8b5cf6" opacity="0.45"><animate attributeName="cx" values="380;370;390;380" dur="20s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.3;0.6;0.3" dur="6s" repeatCount="indefinite"/></circle>
+  <circle cx="380" cy="260" r="10" fill="url(#ng2)" opacity="0.18"><animate attributeName="cx" values="380;370;390;380" dur="20s" repeatCount="indefinite"/></circle>
+
+  <circle cx="620" cy="160" r="2" fill="#06b6d4" opacity="0.4"><animate attributeName="cx" values="620;632;614;620" dur="22s" repeatCount="indefinite"/><animate attributeName="cy" values="160;150;168;160" dur="16s" repeatCount="indefinite"/></circle>
+  <circle cx="620" cy="160" r="10" fill="url(#ng3)" opacity="0.15"><animate attributeName="cx" values="620;632;614;620" dur="22s" repeatCount="indefinite"/></circle>
+
+  <circle cx="900" cy="320" r="3" fill="#3b82f6" opacity="0.45"><animate attributeName="cy" values="320;308;328;320" dur="19s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.3;0.6;0.3" dur="7s" repeatCount="indefinite"/></circle>
+  <circle cx="900" cy="320" r="14" fill="url(#ng1)" opacity="0.18"><animate attributeName="cy" values="320;308;328;320" dur="19s" repeatCount="indefinite"/><animate attributeName="r" values="12;18;12" dur="7s" repeatCount="indefinite"/></circle>
+
+  <circle cx="1180" cy="180" r="2" fill="#8b5cf6" opacity="0.4"><animate attributeName="cy" values="180;170;188;180" dur="17s" repeatCount="indefinite"/></circle>
+  <circle cx="1180" cy="180" r="10" fill="url(#ng2)" opacity="0.15"><animate attributeName="cy" values="180;170;188;180" dur="17s" repeatCount="indefinite"/></circle>
+
+  <circle cx="1360" cy="400" r="1.8" fill="#06b6d4" opacity="0.35"><animate attributeName="cy" values="400;388;408;400" dur="20s" repeatCount="indefinite"/></circle>
+
+  <circle cx="220" cy="520" r="2" fill="#06b6d4" opacity="0.4"><animate attributeName="cx" values="220;230;214;220" dur="21s" repeatCount="indefinite"/></circle>
+  <circle cx="220" cy="520" r="10" fill="url(#ng3)" opacity="0.15"><animate attributeName="cx" values="220;230;214;220" dur="21s" repeatCount="indefinite"/></circle>
+
+  <circle cx="460" cy="640" r="1.8" fill="#3b82f6" opacity="0.35"><animate attributeName="cx" values="460;470;452;460" dur="23s" repeatCount="indefinite"/></circle>
+
+  <circle cx="740" cy="500" r="2.2" fill="#8b5cf6" opacity="0.4"><animate attributeName="cx" values="740;730;750;740" dur="19s" repeatCount="indefinite"/><animate attributeName="cy" values="500;490;508;500" dur="15s" repeatCount="indefinite"/></circle>
+  <circle cx="740" cy="500" r="10" fill="url(#ng2)" opacity="0.15"><animate attributeName="cx" values="740;730;750;740" dur="19s" repeatCount="indefinite"/></circle>
+
+  <circle cx="1040" cy="680" r="2" fill="#06b6d4" opacity="0.35"><animate attributeName="cx" values="1040;1050;1032;1040" dur="18s" repeatCount="indefinite"/></circle>
+  <circle cx="1320" cy="560" r="1.5" fill="#3b82f6" opacity="0.3"><animate attributeName="cy" values="560;550;568;560" dur="16s" repeatCount="indefinite"/></circle>
+
+  <!-- Ambient particles -->
+  <circle cx="80" cy="780" r="1" fill="#3b82f6" opacity="0.15"><animate attributeName="opacity" values="0.08;0.22;0.08" dur="8s" repeatCount="indefinite"/></circle>
+  <circle cx="520" cy="40" r="1" fill="#8b5cf6" opacity="0.12"><animate attributeName="opacity" values="0.06;0.18;0.06" dur="10s" repeatCount="indefinite"/></circle>
+  <circle cx="1100" cy="80" r="1" fill="#06b6d4" opacity="0.12"><animate attributeName="opacity" values="0.06;0.18;0.06" dur="9s" repeatCount="indefinite"/></circle>
+  <circle cx="300" cy="380" r="0.8" fill="#3b82f6" opacity="0.1"><animate attributeName="opacity" values="0.05;0.15;0.05" dur="7s" repeatCount="indefinite"/></circle>
+  <circle cx="1280" cy="760" r="0.8" fill="#8b5cf6" opacity="0.1"><animate attributeName="opacity" values="0.05;0.15;0.05" dur="12s" repeatCount="indefinite"/></circle>
+</svg>
+</div>
+"""
+st.markdown(_svg_bg, unsafe_allow_html=True)
 
 if not initialize_ai():
     st.error("GEMINI_API_KEY not found. Please set it in your environment variables or .env file.")

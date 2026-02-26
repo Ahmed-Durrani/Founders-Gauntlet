@@ -99,8 +99,8 @@ def render_animated_hp_bar():
   width: 100%;
   height: 16px;
   border-radius: 999px;
-  background: rgba(255,255,255,0.12);
-  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
   overflow: hidden;
 }}
 .hp-fill {{
@@ -160,12 +160,12 @@ def bootstrap_local_recovery():
         st.toast("Recovered active run from local storage.")
 
 
-def _render_mobile_mic_lock_bridge():
+def _render_whatsapp_mic_bridge():
     """
-    Mobile gesture helper:
-    - hold mic to start recording
-    - slide up while holding to lock mic
-    - release to stop if not locked
+    JavaScript bridge for WhatsApp-style mic behaviour:
+    - Desktop: click mic to start, click again to stop & send
+    - Mobile: hold mic to record, release to stop & send
+    - Mobile: swipe up while holding to lock mic (keeps recording)
     """
     components.html(
         """
@@ -174,116 +174,59 @@ def _render_mobile_mic_lock_bridge():
   const doc = window.parent && window.parent.document ? window.parent.document : document;
 
   function bind() {
-    const micBtn = doc.querySelector(".st-key-fg_voice_mic_button button");
-    const lockBtn = doc.querySelector(".st-key-fg_voice_lock_button button, .st-key-fg_voice_unlock_button button");
-    const stopBtn = doc.querySelector(".st-key-fg_voice_stop_button button");
-
-    if (!micBtn || !lockBtn || !stopBtn || micBtn.dataset.fgVoiceGestureBound === "1") {
-      return;
-    }
-    micBtn.dataset.fgVoiceGestureBound = "1";
+    const micBtn = doc.querySelector(".st-key-fg_mic_btn button");
+    const stopBtn = doc.querySelector(".st-key-fg_mic_stop button");
+    if (!micBtn || micBtn.dataset.fgWhatsappBound === "1") return;
+    micBtn.dataset.fgWhatsappBound = "1";
 
     let startY = null;
-    let holdTimer = null;
-    let holdTriggered = false;
-    let lockTriggeredDuringHold = false;
     let touchActive = false;
+    let lockTriggered = false;
 
+    // Mobile: hold to record
     micBtn.addEventListener("touchstart", function (ev) {
       if (!ev.touches || ev.touches.length === 0) return;
       touchActive = true;
+      lockTriggered = false;
       startY = ev.touches[0].clientY;
-      holdTriggered = false;
-      lockTriggeredDuringHold = false;
-
-      if (holdTimer) {
-        clearTimeout(holdTimer);
-      }
-
-      holdTimer = setTimeout(function () {
-        if (!touchActive) return;
-        holdTriggered = true;
-        micBtn.click();
-        setTimeout(function () {
-          micBtn.click();
-        }, 90);
-      }, 240);
+      // Start recording on hold
+      micBtn.click();
     }, { passive: true });
 
+    // Mobile: swipe up to lock
     micBtn.addEventListener("touchmove", function (ev) {
       if (!touchActive || startY === null || !ev.touches || ev.touches.length === 0) return;
       const deltaY = startY - ev.touches[0].clientY;
-      if (deltaY > 44 && !lockTriggeredDuringHold) {
-        if (!holdTriggered) {
-          holdTriggered = true;
-          micBtn.click();
-          setTimeout(function () {
-            micBtn.click();
-          }, 90);
-        }
-        lockBtn.click();
-        lockTriggeredDuringHold = true;
+      if (deltaY > 50 && !lockTriggered) {
+        lockTriggered = true;
+        // Lock the mic by clicking the hidden lock button
+        const lockBtn = doc.querySelector(".st-key-fg_mic_lock button");
+        if (lockBtn) lockBtn.click();
       }
     }, { passive: true });
 
+    // Mobile: release to stop & send (unless locked)
     micBtn.addEventListener("touchend", function () {
+      if (!touchActive) return;
       touchActive = false;
-      if (holdTimer) {
-        clearTimeout(holdTimer);
-      }
-      const isLocked = !!doc.querySelector(".st-key-fg_voice_unlock_button button");
-      if (holdTriggered && !isLocked && !lockTriggeredDuringHold) {
-        stopBtn.click();
-      }
       startY = null;
-      holdTriggered = false;
-      lockTriggeredDuringHold = false;
-      holdTimer = null;
+      if (!lockTriggered) {
+        // Not locked: stop recording on release
+        if (stopBtn) stopBtn.click();
+      }
+      lockTriggered = false;
     }, { passive: true });
 
     micBtn.addEventListener("touchcancel", function () {
       touchActive = false;
-      if (holdTimer) {
-        clearTimeout(holdTimer);
-      }
       startY = null;
-      holdTriggered = false;
-      lockTriggeredDuringHold = false;
-      holdTimer = null;
+      lockTriggered = false;
     }, { passive: true });
   }
 
-  let attempts = 0;
-  const timer = setInterval(() => {
-    bind();
-    attempts += 1;
-    if (attempts > 20) {
-      clearInterval(timer);
-    }
-  }, 250);
-
-  bind();
-})();
-</script>
-""",
-        height=0,
-        width=0,
-    )
-
-
-def _render_chat_mic_near_send_bridge():
-    """
-    Desktop/mobile keyboard mode helper:
-    places the Mic trigger beside the chat send button.
-    """
-    components.html(
-        """
-<script>
-(function () {
-  const doc = window.parent && window.parent.document ? window.parent.document : document;
-
+  // Position mic button next to send
   function place() {
-    const micWrap = doc.querySelector(".st-key-fg_open_voice_mode");
+    const micWrap = doc.querySelector(".st-key-fg_mic_btn");
     const chatRoot = doc.querySelector('[data-testid="stChatInput"]');
     if (!micWrap || !chatRoot) return;
     const sendBtn = chatRoot.querySelector("button");
@@ -302,13 +245,13 @@ def _render_chat_mic_near_send_bridge():
 
   let tries = 0;
   const timer = setInterval(function () {
+    bind();
     place();
     tries += 1;
-    if (tries > 40) {
-      clearInterval(timer);
-    }
-  }, 120);
+    if (tries > 40) clearInterval(timer);
+  }, 200);
 
+  bind();
   place();
   window.addEventListener("resize", place);
 })();
@@ -319,16 +262,8 @@ def _render_chat_mic_near_send_bridge():
     )
 
 
-def _stop_voice_capture(message="Recording stopped."):
-    st.session_state.voice_recording = False
-    st.session_state.voice_mic_locked = False
-    st.session_state.voice_recorder_open = False
-    st.session_state.voice_double_click_deadline = 0.0
-    st.session_state.voice_audio_nonce = int(st.session_state.voice_audio_nonce) + 1
-    st.session_state.voice_lock_prompt = message
-
-
-def _handle_voice_audio_capture(audio_file):
+def _handle_voice_auto_send(audio_file):
+    """Process recorded audio → transcribe → auto-send as user input."""
     audio_bytes = audio_file.getvalue() if audio_file else b""
     if not audio_bytes:
         return
@@ -345,142 +280,85 @@ def _handle_voice_audio_capture(audio_file):
     st.session_state.voice_audio_nonce = int(st.session_state.voice_audio_nonce) + 1
 
     if transcript:
-        st.session_state.last_voice_transcript = transcript
         st.session_state.pending_voice_text = transcript
-        st.session_state.voice_lock_prompt = "Voice draft ready. Edit and send."
-        if not st.session_state.voice_mic_locked:
-            st.session_state.voice_recording = False
-            st.session_state.voice_recorder_open = False
+        st.session_state.voice_recording = False
+        st.session_state.voice_mic_locked = False
     else:
-        st.session_state.voice_lock_prompt = "Transcription failed. Record again."
+        st.session_state.voice_recording = False
+        st.session_state.voice_mic_locked = False
+        st.toast("Couldn't transcribe audio. Try again.")
 
     st.rerun()
 
 
 def render_compact_voice_controls():
+    """
+    WhatsApp-style mic button.
+    - Desktop: click to start recording, click again to stop & send
+    - Mobile: hold to record, release to send; swipe up to lock
+    Returns: (voice_user_input, allow_typed_input)
+    """
     voice_user_input = None
-    now = time.time()
-    deadline = float(st.session_state.voice_double_click_deadline or 0.0)
-    if deadline and now > deadline:
-        st.session_state.voice_double_click_deadline = 0.0
-        if st.session_state.voice_lock_prompt == "Click Mic again to start recording (desktop).":
-            st.session_state.voice_lock_prompt = ""
 
-    if not st.session_state.voice_mode_active:
-        with st.container(key="fg_chat_mic_anchor"):
-            enter_voice_mode = st.button(
-                "Mic",
-                key="fg_open_voice_mode",
-                help="Open voice mode.",
-            )
-        _render_chat_mic_near_send_bridge()
-        if enter_voice_mode:
-            st.session_state.voice_mode_active = True
-            st.session_state.voice_lock_prompt = (
-                "Voice mode on. Desktop: double-click Mic. Mobile: hold Mic, slide up to lock."
-            )
-            st.session_state.voice_double_click_deadline = 0.0
-            st.rerun()
-        return voice_user_input, True
+    # Always allow typed input alongside mic
+    is_recording = st.session_state.voice_recording
+    is_locked = st.session_state.voice_mic_locked
 
-    with st.container(key="fg_voice_bar_shell"):
-        st.caption("Voice mode active. Desktop: double-click Mic. Mobile: hold Mic and slide up to lock.")
-        mic_col, lock_col, stop_col, exit_col = st.columns([0.18, 0.18, 0.18, 0.46], gap="small")
-        with mic_col:
+    # ── Mic button (always visible next to chat input) ──
+    with st.container(key="fg_chat_mic_anchor"):
+        if not is_recording:
             mic_clicked = st.button(
-                "Mic",
-                key="fg_voice_mic_button",
-                help="Desktop: double-click to start. Mobile: hold to record.",
+                "🎤",
+                key="fg_mic_btn",
+                help="Click to record. Mobile: hold to record, swipe up to lock.",
             )
-        with lock_col:
-            if st.session_state.voice_mic_locked:
-                lock_clicked = st.button(
-                    "Unlock",
-                    key="fg_voice_unlock_button",
-                    help="Unlock the microphone.",
-                )
-            else:
-                lock_clicked = st.button(
-                    "Lock",
-                    key="fg_voice_lock_button",
-                    help="Lock the microphone while recording.",
-                )
-        with stop_col:
-            stop_clicked = st.button(
-                "Stop",
-                key="fg_voice_stop_button",
-                help="Stop current voice capture.",
-            )
-        with exit_col:
-            exit_voice_mode = st.button(
-                "Type",
-                key="fg_voice_exit_mode",
-                help="Return to text chat input.",
+        else:
+            mic_clicked = st.button(
+                "🎤",
+                key="fg_mic_btn",
+                help="Click to stop recording and send.",
             )
 
-        wave_state = "is-recording" if st.session_state.voice_recording else "is-idle"
-        wave_label = "Recording" if st.session_state.voice_recording else "Ready"
-        lock_label = "Locked" if st.session_state.voice_mic_locked else "Unlocked"
+    # Hidden buttons for JS bridge (lock / stop)
+    lock_col, stop_col = st.columns([0.5, 0.5], gap="small")
+    with lock_col:
+        lock_clicked = st.button("lock", key="fg_mic_lock")
+    with stop_col:
+        stop_clicked = st.button("stop", key="fg_mic_stop")
+
+    # Handle mic click (desktop toggle)
+    if mic_clicked:
+        if not is_recording:
+            st.session_state.voice_recording = True
+            st.session_state.voice_mic_locked = False
+            st.rerun()
+        else:
+            # Stop & will auto-send after transcription
+            st.session_state.voice_recording = False
+            st.session_state.voice_mic_locked = False
+
+    if lock_clicked and is_recording:
+        st.session_state.voice_mic_locked = True
+        st.rerun()
+
+    if stop_clicked:
+        st.session_state.voice_recording = False
+        st.session_state.voice_mic_locked = False
+
+    # ── Recording overlay (shown when recording + locked) ──
+    if is_recording and is_locked:
         st.markdown(
-            f"""
-<div class="fg-voice-wave {wave_state}">
-  <span class="fg-wave-dot"></span>
-  <span class="fg-wave-text">{wave_label} - {lock_label}</span>
-  <span class="fg-wave-bars">
-    <i></i><i></i><i></i><i></i><i></i>
-  </span>
+            """
+<div class="fg-recording-overlay">
+  <span class="fg-rec-dot"></span>
+  <span class="fg-rec-text">Recording... Swipe locked</span>
 </div>
 """,
             unsafe_allow_html=True,
         )
 
-    if exit_voice_mode:
-        _stop_voice_capture("Returned to keyboard mode.")
-        st.session_state.voice_mode_active = False
-        st.rerun()
-
-    if mic_clicked:
-        st.session_state.voice_recorder_open = True
-        if st.session_state.voice_recording:
-            st.session_state.voice_lock_prompt = "Recording in progress. Press Stop when done."
-        else:
-            if deadline and now <= deadline:
-                st.session_state.voice_recording = True
-                st.session_state.voice_double_click_deadline = 0.0
-                st.session_state.voice_lock_prompt = "Recording started."
-            else:
-                st.session_state.voice_double_click_deadline = now + 1.25
-                st.session_state.voice_lock_prompt = "Click Mic again to start recording (desktop)."
-
-    if lock_clicked:
-        if not st.session_state.voice_recording:
-            st.session_state.voice_lock_prompt = "Start recording first, then lock the mic."
-        else:
-            st.session_state.voice_mic_locked = not st.session_state.voice_mic_locked
-            st.session_state.voice_recorder_open = True
-            st.session_state.voice_lock_prompt = (
-                "Mic locked. Press Stop when done."
-                if st.session_state.voice_mic_locked
-                else "Mic unlocked."
-            )
-
-    if stop_clicked:
-        _stop_voice_capture("Recording stopped.")
-
-    status_col = st.container()
-    with status_col:
-        if st.session_state.voice_lock_prompt:
-            st.caption(st.session_state.voice_lock_prompt)
-        else:
-            st.caption("Mobile: hold Mic and slide up to lock. Desktop: double-click Mic to start.")
-
-    _render_mobile_mic_lock_bridge()
-
-    show_recorder = bool(
-        st.session_state.voice_mode_active
-        and (st.session_state.voice_recording or st.session_state.voice_mic_locked)
-    )
-    if show_recorder:
+    # ── Audio input (shown when recording) ──
+    if st.session_state.voice_recording or is_locked:
         audio_file = st.audio_input(
             "Record your pitch",
             label_visibility="collapsed",
@@ -488,32 +366,18 @@ def render_compact_voice_controls():
             key=f"fg_chat_audio_{int(st.session_state.voice_audio_nonce)}",
         )
         if audio_file is not None:
-            _handle_voice_audio_capture(audio_file)
+            _handle_voice_auto_send(audio_file)
 
+    # ── Auto-send pending transcript ──
     if st.session_state.pending_voice_text:
-        st.text_area(
-            "Voice draft",
-            key="pending_voice_text",
-            height=88,
-            label_visibility="collapsed",
-            placeholder="Voice draft (editable before send)",
-        )
-        send_col, discard_col = st.columns([0.6, 0.4], gap="small")
-        if send_col.button("Send Voice", key="fg_send_voice_draft"):
-            draft = st.session_state.pending_voice_text.strip()
-            if draft:
-                voice_user_input = draft
-                st.session_state.last_voice_transcript = draft
-                st.session_state.pending_voice_text = ""
-                if not st.session_state.voice_mic_locked:
-                    st.session_state.voice_recorder_open = False
-            else:
-                st.warning("Voice draft is empty.")
-        if discard_col.button("Discard", key="fg_discard_voice_draft"):
-            st.session_state.pending_voice_text = ""
-            st.session_state.voice_lock_prompt = "Voice draft discarded."
+        voice_user_input = st.session_state.pending_voice_text.strip()
+        st.session_state.pending_voice_text = ""
+        if not voice_user_input:
+            voice_user_input = None
 
-    return voice_user_input, False
+    _render_whatsapp_mic_bridge()
+
+    return voice_user_input, True
 
 
 def apply_perk_choice(perk_key, next_level):
@@ -769,23 +633,49 @@ def render_game_view():
     render_damage_flash_overlay()
 
     st.markdown(
-        "<h1 style='color:#000000 !important; margin-bottom:0.25rem;'>The Founder's Gauntlet</h1>",
+        """
+<div style="animation: fgFadeInUp 0.6s ease-out both; position:relative; z-index:10;">
+  <h1 style="
+    background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 50%, #c084fc 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-size: 2.2rem;
+    font-weight: 800;
+    margin-bottom: 0.25rem;
+    filter: drop-shadow(0 0 25px rgba(59, 130, 246, 0.3));
+    letter-spacing: -0.02em;
+  ">The Founder's Gauntlet</h1>
+</div>
+""",
         unsafe_allow_html=True,
     )
     st.markdown(
-        "<p style='color:#000000 !important; margin:0 0 0.5rem 0;'>"
-        "Pitch your startup. Survive the investors. Don't run out of confidence."
-        "</p>",
+        """
+<div style="animation: fgFadeInUp 0.6s ease-out 0.1s both; position:relative; z-index:10;">
+  <p style="color: #9ca3af; margin: 0 0 0.5rem 0; font-size: 1.05rem; font-weight: 400;">
+    Pitch your startup. Survive the investors. Don't run out of confidence.
+  </p>
+</div>
+""",
         unsafe_allow_html=True,
     )
     st.markdown(
-        f"<p style='color:#000000 !important; margin:0;'>Current Theme: {st.session_state.startup_theme}</p>",
+        f"""
+<div style="animation: fgFadeInUp 0.6s ease-out 0.2s both; position:relative; z-index:10;">
+  <p style="color: #6b7280; margin: 0; font-size: 0.9rem;">Current Theme: {st.session_state.startup_theme}</p>
+</div>
+""",
         unsafe_allow_html=True,
     )
     st.markdown(
-        "<p style='color:#000000 !important; margin:0.15rem 0 0.65rem 0;'>"
-        "Streaming mode enabled: investor replies render token-by-token."
-        "</p>",
+        """
+<div style="animation: fgFadeInUp 0.6s ease-out 0.3s both; position:relative; z-index:10;">
+  <p style="color: #6b7280; margin: 0.15rem 0 0.65rem 0; font-size: 0.85rem;">
+    Streaming mode enabled: investor replies render token-by-token.
+  </p>
+</div>
+""",
         unsafe_allow_html=True,
     )
 

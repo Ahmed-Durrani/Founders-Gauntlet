@@ -38,11 +38,7 @@ SESSION_DEFAULTS = {
     "pending_voice_text": "",
     "last_voice_transcript": "",
     "voice_mic_locked": False,
-    "voice_mode_active": False,
     "voice_recording": False,
-    "voice_recorder_open": False,
-    "voice_double_click_deadline": 0.0,
-    "voice_lock_prompt": "",
     "voice_last_audio_hash": "",
     "voice_audio_nonce": 0,
     "turn_damage_log": [],
@@ -90,11 +86,7 @@ def reset_run():
     st.session_state.pending_voice_text = ""
     st.session_state.last_voice_transcript = ""
     st.session_state.voice_mic_locked = False
-    st.session_state.voice_mode_active = False
     st.session_state.voice_recording = False
-    st.session_state.voice_recorder_open = False
-    st.session_state.voice_double_click_deadline = 0.0
-    st.session_state.voice_lock_prompt = ""
     st.session_state.voice_last_audio_hash = ""
     st.session_state.voice_audio_nonce = 0
     st.session_state.turn_damage_log = []
