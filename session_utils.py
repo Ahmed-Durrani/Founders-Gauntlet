@@ -35,6 +35,8 @@ SESSION_DEFAULTS = {
     "db_ready": False,
     "db_error": "",
     "db_checked": False,
+    "db_checked_at": 0.0,
+    "db_status_force_refresh": False,
     "pending_voice_text": "",
     "last_voice_transcript": "",
     "voice_mic_locked": False,

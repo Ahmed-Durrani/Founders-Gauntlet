@@ -1,3 +1,5 @@
+import time
+
 import streamlit as st
 from dotenv import load_dotenv
 
@@ -11,6 +13,8 @@ from views.leaderboard import render_leaderboard_view
 load_dotenv()
 
 st.set_page_config(page_title="The Founder's Gauntlet", page_icon="💼", layout="wide")
+
+DB_STATUS_TTL_SECONDS = 45
 
 def _hex_to_rgb(hex_color):
     value = hex_color.lstrip("#")
@@ -32,6 +36,39 @@ def _blend(hex_a, hex_b, t):
         a[2] + (b[2] - a[2]) * t,
     )
     return _rgb_to_hex(mixed)
+
+
+def _looks_like_raw_db_error(message):
+    lowered = (message or "").lower()
+    raw_error_markers = (
+        "multiple connection attempts failed",
+        "tenant or user not found",
+        "hostaddr:",
+    )
+    return any(marker in lowered for marker in raw_error_markers)
+
+
+def refresh_database_status(force=False):
+    now = time.time()
+    last_checked = float(st.session_state.get("db_checked_at", 0.0) or 0.0)
+    cached_error = st.session_state.get("db_error", "")
+    should_refresh = force or not st.session_state.db_checked
+
+    if not should_refresh and (now - last_checked) >= DB_STATUS_TTL_SECONDS:
+        should_refresh = True
+
+    if not should_refresh and not st.session_state.db_ready and _looks_like_raw_db_error(cached_error):
+        should_refresh = True
+
+    if not should_refresh:
+        return
+
+    db_ready, db_error = initialize_database()
+    st.session_state.db_ready = db_ready
+    st.session_state.db_error = db_error or ""
+    st.session_state.db_checked = True
+    st.session_state.db_checked_at = now
+    st.session_state.db_status_force_refresh = False
 
 
 ensure_session_state()
@@ -627,11 +664,7 @@ if not initialize_ai():
     st.error("GEMINI_API_KEY not found. Please set it in your environment variables or .env file.")
     st.stop()
 
-if not st.session_state.db_checked:
-    db_ready, db_error = initialize_database()
-    st.session_state.db_ready = db_ready
-    st.session_state.db_error = db_error or ""
-    st.session_state.db_checked = True
+refresh_database_status(force=bool(st.session_state.get("db_status_force_refresh")))
 
 pages = [
     st.Page(render_game_view, title="Game", icon="🎮", url_path="game", default=True),

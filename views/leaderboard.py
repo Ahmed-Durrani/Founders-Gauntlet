@@ -8,6 +8,10 @@ def render_leaderboard_view():
     st.caption("Founder and syndicate rankings based on secured valuation.")
 
     if not st.session_state.db_ready:
+        if st.button("Retry Database Connection", key="fg_retry_database"):
+            st.session_state.db_checked = False
+            st.session_state.db_status_force_refresh = True
+            st.rerun()
         if st.session_state.db_error:
             st.warning(f"Leaderboard unavailable: {st.session_state.db_error}")
         else:

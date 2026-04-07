@@ -606,6 +606,10 @@ def render_sidebar():
             st.caption("Multiplayer database: connected")
         else:
             st.caption(f"Multiplayer database: offline ({st.session_state.db_error or 'not configured'})")
+            if st.button("Retry DB", key="fg_retry_db_sidebar"):
+                st.session_state.db_checked = False
+                st.session_state.db_status_force_refresh = True
+                st.rerun()
         if st.session_state.local_storage_notice:
             st.caption(f"Recovery: {st.session_state.local_storage_notice}")
 

@@ -1,5 +1,6 @@
 import json
 import os
+from urllib.parse import parse_qsl, quote, unquote, urlencode, urlsplit, urlunsplit
 
 try:
     import psycopg
@@ -8,9 +9,170 @@ except ImportError:
     psycopg = None
     dict_row = None
 
+CONNECT_TIMEOUT_SECONDS = 8
+
+
+class DatabaseConnectionError(RuntimeError):
+    def __init__(self, message, failures=None):
+        super().__init__(message)
+        self.failures = failures or []
+
 
 def _get_database_url():
-    return (os.getenv("DATABASE_URL") or "").strip()
+    database_url = (os.getenv("DATABASE_URL") or "").strip()
+    if len(database_url) >= 2 and database_url[0] == database_url[-1] and database_url[0] in {"'", '"'}:
+        database_url = database_url[1:-1].strip()
+    return database_url
+
+
+def _url_host(parts):
+    return (parts.hostname or "").strip().lower()
+
+
+def _contains_any(text, patterns):
+    lowered = text.lower()
+    return any(pattern.lower() in lowered for pattern in patterns)
+
+
+def _with_default_sslmode(query):
+    params = parse_qsl(query, keep_blank_values=True)
+    if not any(key.lower() == "sslmode" for key, _ in params):
+        params.append(("sslmode", "require"))
+    return urlencode(params, doseq=True)
+
+
+def _normalize_database_url(database_url):
+    parts = urlsplit(database_url)
+    host = _url_host(parts)
+    if "supabase" not in host:
+        return database_url
+
+    normalized_query = _with_default_sslmode(parts.query)
+    return urlunsplit(
+        (
+            parts.scheme or "postgresql",
+            parts.netloc,
+            parts.path or "/postgres",
+            normalized_query,
+            parts.fragment,
+        )
+    )
+
+
+def _build_supabase_direct_candidate(parts):
+    host = _url_host(parts)
+    username = parts.username or ""
+    if not host.endswith(".pooler.supabase.com"):
+        return None
+    if "." not in username or not username.startswith("postgres."):
+        return None
+
+    project_ref = username.split(".", 1)[1].strip()
+    if not project_ref:
+        return None
+
+    password = unquote(parts.password or "")
+    query = _with_default_sslmode(parts.query)
+    direct_netloc = (
+        f"{quote('postgres', safe='')}:{quote(password, safe='')}"
+        f"@db.{project_ref}.supabase.co:5432"
+    )
+    direct_url = urlunsplit(
+        (
+            parts.scheme or "postgresql",
+            direct_netloc,
+            parts.path or "/postgres",
+            query,
+            "",
+        )
+    )
+    return "supabase_direct", direct_url
+
+
+def _build_connection_candidates(database_url):
+    normalized_url = _normalize_database_url(database_url)
+    candidates = [("primary", normalized_url)]
+    direct_candidate = _build_supabase_direct_candidate(urlsplit(normalized_url))
+    if direct_candidate and direct_candidate[1] != normalized_url:
+        candidates.append(direct_candidate)
+    return candidates
+
+
+def _summarize_connection_error(database_url, failures):
+    parts = urlsplit(database_url)
+    host = parts.hostname or "database host"
+    combined_text = "\n".join(str(exc) for _, exc in failures)
+    first_error = str(failures[-1][1]).splitlines()[0].strip() if failures else "Unknown database error."
+
+    if _contains_any(combined_text, ["tenant or user not found"]):
+        direct_dns_failed = any(
+            label == "supabase_direct"
+            and _contains_any(
+                str(exc),
+                [
+                    "getaddrinfo failed",
+                    "could not translate host name",
+                    "name or service not known",
+                    "temporary failure in name resolution",
+                ],
+            )
+            for label, exc in failures
+        )
+        if direct_dns_failed:
+            return (
+                "Supabase rejected DATABASE_URL (tenant or user not found), and the matching direct host "
+                "could not be resolved. DATABASE_URL likely points at the wrong Supabase project or a deleted one."
+            )
+        return (
+            "Supabase rejected DATABASE_URL (tenant or user not found). "
+            "Replace it with a fresh Postgres connection string from the active Supabase project."
+        )
+
+    if _contains_any(combined_text, ["password authentication failed"]):
+        return "Database password authentication failed. Check DATABASE_URL."
+
+    if _contains_any(
+        combined_text,
+        [
+            "getaddrinfo failed",
+            "could not translate host name",
+            "name or service not known",
+            "temporary failure in name resolution",
+        ],
+    ):
+        return f"Database host '{host}' could not be resolved."
+
+    if _contains_any(combined_text, ["permission denied (0x0000271d/10013)"]):
+        return f"Database host '{host}' is blocked from this environment."
+
+    if _contains_any(combined_text, ["timeout expired", "timed out"]):
+        return f"Timed out connecting to database host '{host}'."
+
+    if _contains_any(combined_text, ["connection refused"]):
+        return f"Database host '{host}' refused the connection."
+
+    return first_error
+
+
+def _connect_to_database(row_factory=None):
+    database_url = _get_database_url()
+    if psycopg is None:
+        raise DatabaseConnectionError("psycopg is not installed.")
+    if not database_url:
+        raise DatabaseConnectionError("DATABASE_URL is not set.")
+
+    connect_kwargs = {"connect_timeout": CONNECT_TIMEOUT_SECONDS}
+    if row_factory is not None:
+        connect_kwargs["row_factory"] = row_factory
+
+    failures = []
+    for label, conninfo in _build_connection_candidates(database_url):
+        try:
+            return psycopg.connect(conninfo, **connect_kwargs)
+        except Exception as exc:
+            failures.append((label, exc))
+
+    raise DatabaseConnectionError(_summarize_connection_error(database_url, failures), failures=failures)
 
 
 def _clean_text(value, max_len):
@@ -25,14 +187,8 @@ def initialize_database():
     Initializes required tables.
     Returns: (is_ready, error_message)
     """
-    database_url = _get_database_url()
-    if psycopg is None:
-        return False, "psycopg is not installed."
-    if not database_url:
-        return False, "DATABASE_URL is not set."
-
     try:
-        with psycopg.connect(database_url) as conn:
+        with _connect_to_database() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -84,8 +240,10 @@ def initialize_database():
                 )
             conn.commit()
         return True, None
-    except Exception as exc:
+    except DatabaseConnectionError as exc:
         return False, str(exc)
+    except Exception as exc:
+        return False, str(exc).splitlines()[0].strip()
 
 
 def _upsert_clan(cur, clan_name):
@@ -126,10 +284,9 @@ def save_run_result(player_handle, clan_name, run_payload):
     Persists one completed run.
     Returns run_id on success, None on failure.
     """
-    database_url = _get_database_url()
     if psycopg is None:
         return None
-    if not database_url:
+    if not _get_database_url():
         return None
 
     handle = _clean_text(player_handle, 40)
@@ -160,7 +317,7 @@ def save_run_result(player_handle, clan_name, run_payload):
     transcript = run_payload.get("transcript", [])
 
     try:
-        with psycopg.connect(database_url) as conn:
+        with _connect_to_database() as conn:
             with conn.cursor() as cur:
                 clan_id = _upsert_clan(cur, clan) if clan else None
                 player_id = _upsert_player(cur, handle, clan_id)
@@ -201,16 +358,15 @@ def save_run_result(player_handle, clan_name, run_payload):
 
 
 def fetch_player_leaderboard(limit=10):
-    database_url = _get_database_url()
     if psycopg is None:
         return []
-    if not database_url:
+    if not _get_database_url():
         return []
 
     safe_limit = max(1, min(int(limit), 100))
 
     try:
-        with psycopg.connect(database_url, row_factory=dict_row) as conn:
+        with _connect_to_database(row_factory=dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -235,16 +391,15 @@ def fetch_player_leaderboard(limit=10):
 
 
 def fetch_clan_leaderboard(limit=10):
-    database_url = _get_database_url()
     if psycopg is None:
         return []
-    if not database_url:
+    if not _get_database_url():
         return []
 
     safe_limit = max(1, min(int(limit), 100))
 
     try:
-        with psycopg.connect(database_url, row_factory=dict_row) as conn:
+        with _connect_to_database(row_factory=dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
